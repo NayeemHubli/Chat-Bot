@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+           body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            width: 400px;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-log {
+            height: 300px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        .chat-box {
+            display: flex;
+            margin-bottom: 10px;
+            max-width: 100%;
+        }
+
+        .user {
+            justify-content: flex-end;
+            align-items: flex-end;
+        }
+
+        .bot {
+            justify-content: flex-start;
+            align-items: flex-end;
+        }
+
+        .user .message-bubble {
+            background-color: #007bff;
+            color: white;
+            border-radius: 10px 10px 0 10px;
+            margin-right: 5px;
+            padding: 8px 15px;
+            max-width: 70%;
+            margin-left: auto; /* Align user message to the right */
+        }
+
+        .bot .message-bubble {
+            background-color: #ccc;
+            color: black;
+            border-radius: 10px 10px 10px 0;
+            margin-left: 5px;
+            padding: 8px 15px;
+            max-width: 70%;
+        }
+
+        .chat-input {
+            display: flex;
+            margin-top: 10px;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 5px;
+        }
+
+        .chat-input button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        h1 {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 10px;
+    opacity: 0;
+    animation: fadeIn 2s ease forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+
+    </style>
+    <title>Chatbot</title>
+</head>
+<body>
+  
+    <div class="chat-container">
+      <h1>NH's Assistant</h1>
+        <div class="chat-log" id="chat-log">
+            <!-- Chat messages will appear here -->
+        </div>
+        <div class="chat-input">
+          {% csrf_token %}
+            <input type="text" id="user-input" name="message" placeholder="Type your message...">
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+   
+             <script>
+    const chatLog = document.getElementById('chat-log');
+    const userInput = document.getElementById('user-input');
+    const sendButton = document.getElementById('send-button');
+
+    sendButton.addEventListener('click', sendMessage);
+
+    // Load previous chat messages from local storage
+    const storedMessages = JSON.parse(localStorage.getItem('chatMessages')) || [];
+
+    storedMessages.forEach(messageData => {
+        displayMessage(messageData.text, messageData.sender);
+    });
+
+    // Add event listener to delete local storage on window close
+   window.addEventListener('beforeunload', (event) => {
+    event.returnValue = 'Are you sure you want to leave/reload? Your chat messages will be cleared.';
+    localStorage.removeItem('chatMessages');
+});
+
+    function sendMessage() {
+        const userMessage = userInput.value.trim();
+        if (userMessage === '') return;
+
+        const userMessageData = { text: userMessage, sender: 'user' };
+        storedMessages.push(userMessageData);
+        localStorage.setItem('chatMessages', JSON.stringify(storedMessages));
+
+        displayMessage(userMessage, 'user');
+
+        userInput.value = '';
+
+        // Send the message to the backend with CSRF token
+        fetch('/receive_message/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: `message=${encodeURIComponent(userMessage)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            const botResponse = data.message;
+            const botReplyData = { text: botResponse, sender: 'bot' };
+            storedMessages.push(botReplyData);
+            localStorage.setItem('chatMessages', JSON.stringify(storedMessages));
+
+            displayMessage(botResponse, 'bot');
+        });
+    }
+
+    // Get the CSRF token from the page's cookies
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function displayMessage(message, sender) {
+        const messageBubble = document.createElement('div');
+        messageBubble.className = `chat-box ${sender}`;
+        messageBubble.innerHTML = `<div class="message-bubble">${message}</div>`;
+        chatLog.appendChild(messageBubble);
+    }
+</script>
+
+</body>
+</html>
